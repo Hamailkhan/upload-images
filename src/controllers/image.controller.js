@@ -71,6 +71,38 @@ const uploadStoreImage = async (req, res) => {
   }
 };
 
+const uploadProductImage = async (req, res) => {
+  try {
+    const files = req.files;
+
+    let imageData = [];
+
+    for (const file of files) {
+      const result = await cloudinary.uploader.upload(file.path, {
+        public_id: `${file.filename}`,
+        folder: "Products",
+      });
+      imageData.push({
+        url: result.secure_url,
+        public_id: result.public_id,
+      });
+      fs.unlinkSync(file.path);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Images uploaded successfully",
+      images: imageData,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Image upload failed",
+      error: error.message,
+    });
+  }
+};
+
 const optimizeImage = async (req, res) => {
   try {
     const { publicId } = req.query;
@@ -94,4 +126,5 @@ const optimizeImage = async (req, res) => {
 module.exports = {
   uploadStoreImage,
   optimizeImage,
+  uploadProductImage,
 };
