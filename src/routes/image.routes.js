@@ -19,7 +19,7 @@ route.post(
 
 route.post(
   "/upload-product-images",
-  upload.array("productImages"),
+  upload.array("productImages", 4),
   uploadProductImage
 );
 
