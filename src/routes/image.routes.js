@@ -23,7 +23,6 @@ route.post(
   uploadProductImage
 );
 
-// route.get("/upload", uploadImage);
 route.get("/optimize", optimizeImage);
 
 module.exports = { route };

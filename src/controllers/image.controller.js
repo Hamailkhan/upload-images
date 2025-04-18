@@ -1,61 +1,44 @@
 const fs = require("fs");
 const cloudinary = require("../config/cloudinary.config");
-
-// const uploadImage = async (req, res) => {
-//   try {
-//     const { folder } = req.body;
-
-//     const uploadResult = await cloudinary.uploader.upload(req.file.path, {
-//       public_id: `${req.file.filename}`,
-//       folder: folder,
-//     });
-
-//     fs.unlinkSync(req.file.path);
-
-//     return res.status(200).json({
-//       success: true,
-//       message: "Image uploaded successfully!",
-//       url: uploadResult.secure_url,
-//       public_id: uploadResult.public_id,
-//     });
-//   } catch (error) {
-//     return res.status(500).json({
-//       success: false,
-//       message: "Image upload failed",
-//       error: error.message,
-//     });
-//   }
-// };
+const uploadQueue = require("../queues/image.queue");
 
 const uploadStoreImage = async (req, res) => {
   try {
     let imageData = {};
 
-    if (req.files.storeLogo) {
-      const file = req.files.storeLogo[0];
+    const processUpload = async (file, folderName) => {
       const result = await cloudinary.uploader.upload(file.path, {
         public_id: `${file.filename}`,
-        folder: "storesLogos",
+        folder: folderName,
       });
       fs.unlinkSync(file.path);
-      imageData.storeLogo = {
+      return {
         url: result.secure_url,
         public_id: result.public_id,
       };
+    };
+
+    const tasks = [];
+
+    if (req.files.storeLogo) {
+      const file = req.files.storeLogo[0];
+      tasks.push(
+        uploadQueue
+          .add(() => processUpload(file, "storesLogos"))
+          .then((data) => (imageData.storeLogo = data))
+      );
     }
 
     if (req.files.storeCover) {
       const file = req.files.storeCover[0];
-      const result = await cloudinary.uploader.upload(file.path, {
-        public_id: `${file.filename}`,
-        folder: "storesCoverPhotos",
-      });
-      fs.unlinkSync(file.path);
-      imageData.storeCover = {
-        url: result.secure_url,
-        public_id: result.public_id,
-      };
+      tasks.push(
+        uploadQueue
+          .add(() => processUpload(file, "storesCoverPhotos"))
+          .then((data) => (imageData.storeCover = data))
+      );
     }
+
+    await Promise.all(tasks);
 
     return res.status(200).json({
       success: true,
@@ -74,20 +57,27 @@ const uploadStoreImage = async (req, res) => {
 const uploadProductImage = async (req, res) => {
   try {
     const files = req.files;
-
     let imageData = [];
 
-    for (const file of files) {
+    const processUpload = async (file) => {
       const result = await cloudinary.uploader.upload(file.path, {
         public_id: `${file.filename}`,
         folder: "Products",
       });
-      imageData.push({
+      fs.unlinkSync(file.path);
+      return {
         url: result.secure_url,
         public_id: result.public_id,
-      });
-      fs.unlinkSync(file.path);
-    }
+      };
+    };
+
+    const tasks = files.map((file) =>
+      uploadQueue
+        .add(() => processUpload(file))
+        .then((data) => imageData.push(data))
+    );
+
+    await Promise.all(tasks);
 
     return res.status(200).json({
       success: true,
